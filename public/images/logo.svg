@@ -1,0 +1,6 @@
+<svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="48" cy="48" r="44" fill="#262a31" stroke="#8a929c" stroke-width="2"/>
+  <circle cx="48" cy="48" r="36" fill="none" stroke="#4b5561" stroke-width="1.5" stroke-dasharray="3 4"/>
+  <polygon points="20,58 34,34 48,50 62,30 76,58" fill="#3a3f47"/>
+  <text x="48" y="62" font-family="Oswald, sans-serif" font-size="34" font-weight="700" fill="#e8590c" text-anchor="middle">N</text>
+</svg>

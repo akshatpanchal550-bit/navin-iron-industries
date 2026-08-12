@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Login — Navin Iron Industries</title>
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="admin-shell">
+
+<div class="login-card">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:26px;">
+    <img src="../images/logo.png" alt="logo" style="height:40px;">
+    <div>
+      <div style="font-family:var(--display);font-size:16px;">NAVIN IRON</div>
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.1em;color:var(--orange-dark);">ADMIN PANEL</div>
+    </div>
+  </div>
+  <h2 style="font-size:20px;margin-bottom:22px;">Log in</h2>
+  <form id="loginForm" style="display:flex;flex-direction:column;gap:16px;">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" name="email" required>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" name="password" required>
+    </div>
+    <div id="loginMsg" class="form-msg"></div>
+    <button type="submit" class="btn btn-primary" id="loginBtn">Log In</button>
+  </form>
+</div>
+
+<script>
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const btn = document.getElementById('loginBtn');
+    const msg = document.getElementById('loginMsg');
+    btn.disabled = true;
+    btn.textContent = 'Logging in…';
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email.value.trim(), password: form.password.value })
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Login failed');
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.className = 'form-msg err show';
+      btn.disabled = false;
+      btn.textContent = 'Log In';
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+.env
+db/navin.db
+db/navin.db-journal
+db/navin.db-wal
+db/navin.db-shm
+public/uploads/*
+!public/uploads/.gitkeep
