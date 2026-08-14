@@ -1,24 +1,16 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { db } = require('../db/db');
 const { requireAdmin } = require('../middleware/auth');
+const { uploadBuffer, deleteImage } = require('../db/cloudinary');
 
 const router = express.Router();
 
-const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const safeName = Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    cb(null, safeName);
-  }
-});
+// Store the uploaded file in memory (not on disk) so we can forward it
+// straight to Cloudinary. Render's local disk is wiped on every restart,
+// so anything saved to disk here would disappear.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 }, // 8MB
   fileFilter: (req, file, cb) => {
     const ok = /image\/(jpeg|png|webp|gif)/.test(file.mimetype);
@@ -27,50 +19,69 @@ const upload = multer({
 });
 
 // Public: list all products (used by services.html to render the catalog)
-router.get('/', (req, res) => {
-  res.json(db.listProducts());
+router.get('/', async (req, res) => {
+  res.json(await db.listProducts());
 });
 
 // Admin: create a product with an uploaded photo
-router.post('/', requireAdmin, upload.single('image'), (req, res) => {
+router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
   const { title, category, description } = req.body;
   if (!title || !req.file) {
     return res.status(400).json({ error: 'Title and image are required' });
   }
-  const imagePath = '/uploads/' + req.file.filename;
-  const product = db.createProduct({ title, category, description, image_path: imagePath });
-  res.json(product);
+  try {
+    const { url, publicId } = await uploadBuffer(req.file.buffer);
+    const product = await db.createProduct({
+      title,
+      category,
+      description,
+      image_path: url,
+      image_public_id: publicId
+    });
+    res.json(product);
+  } catch (err) {
+    console.error('Cloudinary upload failed:', err);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
 });
 
 // Admin: update a product's text fields (and optionally replace its photo)
-router.put('/:id', requireAdmin, upload.single('image'), (req, res) => {
+router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   const { title, category, description } = req.body;
-  const existing = db.getProduct(req.params.id);
+  const existing = await db.getProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
   let imagePath = existing.image_path;
+  let imagePublicId = existing.image_public_id;
+
   if (req.file) {
-    imagePath = '/uploads/' + req.file.filename;
-    const oldFile = path.join(uploadDir, path.basename(existing.image_path));
-    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+    try {
+      const { url, publicId } = await uploadBuffer(req.file.buffer);
+      imagePath = url;
+      imagePublicId = publicId;
+      await deleteImage(existing.image_public_id); // clean up the old photo
+    } catch (err) {
+      console.error('Cloudinary upload failed:', err);
+      return res.status(500).json({ error: 'Image upload failed' });
+    }
   }
 
-  db.updateProduct(req.params.id, {
+  await db.updateProduct(req.params.id, {
     title: title || existing.title,
     category: category || existing.category,
     description: description || existing.description,
-    image_path: imagePath
+    image_path: imagePath,
+    image_public_id: imagePublicId
   });
   res.json({ ok: true });
 });
 
 // Admin: delete a product
-router.delete('/:id', requireAdmin, (req, res) => {
-  const existing = db.getProduct(req.params.id);
+router.delete('/:id', requireAdmin, async (req, res) => {
+  const existing = await db.getProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
-  const file = path.join(uploadDir, path.basename(existing.image_path));
-  if (fs.existsSync(file)) fs.unlinkSync(file);
-  db.deleteProduct(req.params.id);
+  await deleteImage(existing.image_public_id);
+  await db.deleteProduct(req.params.id);
   res.json({ ok: true });
 });
 

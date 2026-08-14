@@ -1,89 +1,101 @@
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
-function loadData() {
-  if (!fs.existsSync(DATA_FILE)) {
-    return { admins: [], products: [], visits: [], nextIds: { admin: 1, product: 1, visit: 1 } };
+async function ensureSeedAdmin() {
+  const { data: existing, error } = await supabase.from('admins').select('id').limit(1);
+  if (error) {
+    console.error('[setup] Could not reach Supabase:', error.message);
+    return;
   }
-  return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-}
-
-let data = loadData();
-
-function save() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-function ensureSeedAdmin() {
-  if (data.admins.length === 0) {
+  if (!existing || existing.length === 0) {
     const email = (process.env.ADMIN_EMAIL || 'admin@example.com').trim().toLowerCase();
     const password = process.env.ADMIN_PASSWORD || 'changeme';
     const hash = bcrypt.hashSync(password, 10);
-    data.admins.push({ id: data.nextIds.admin++, email, password_hash: hash, created_at: new Date().toISOString() });
-    save();
+    await supabase.from('admins').insert({ email, password_hash: hash });
     console.log(`[setup] Created first admin account: ${email}`);
     console.log('[setup] Log in at /admin/login.html with the ADMIN_EMAIL / ADMIN_PASSWORD from your .env file.');
   }
 }
 
 const db = {
-  findAdminByEmail(email) {
-    return data.admins.find(a => a.email === (email || '').trim().toLowerCase());
+  async findAdminByEmail(email) {
+    const { data } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('email', (email || '').trim().toLowerCase())
+      .maybeSingle();
+    return data;
   },
 
-  listProducts() {
-    return [...data.products].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  async listProducts() {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+    return data || [];
   },
 
-  getProduct(id) {
-    return data.products.find(p => p.id === Number(id));
+  async getProduct(id) {
+    const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
+    return data;
   },
 
-  createProduct({ title, category, description, image_path }) {
-    const p = {
-      id: data.nextIds.product++,
-      title,
-      category: category || '',
-      description: description || '',
-      image_path,
-      created_at: new Date().toISOString()
-    };
-    data.products.push(p);
-    save();
-    return p;
+  async createProduct({ title, category, description, image_path, image_public_id }) {
+    const { data, error } = await supabase
+      .from('products')
+      .insert({
+        title,
+        category: category || '',
+        description: description || '',
+        image_path,
+        image_public_id: image_public_id || null
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   },
 
-  updateProduct(id, fields) {
-    const p = db.getProduct(id);
-    if (!p) return null;
-    Object.assign(p, fields);
-    save();
-    return p;
+  async updateProduct(id, fields) {
+    const { data, error } = await supabase
+      .from('products')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    return data;
   },
 
-  deleteProduct(id) {
-    const idx = data.products.findIndex(p => p.id === Number(id));
-    if (idx === -1) return false;
-    data.products.splice(idx, 1);
-    save();
-    return true;
+  async deleteProduct(id) {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    return !error;
   },
 
-  findRecentVisit(visitorId, cooldownMinutes) {
-    const cutoff = Date.now() - cooldownMinutes * 60000;
-    return [...data.visits].reverse().find(
-      v => v.visitor_id === visitorId && new Date(v.created_at).getTime() >= cutoff
-    );
+  async findRecentVisit(visitorId, cooldownMinutes) {
+    const cutoff = new Date(Date.now() - cooldownMinutes * 60000).toISOString();
+    const { data } = await supabase
+      .from('visits')
+      .select('*')
+      .eq('visitor_id', visitorId)
+      .gte('created_at', cutoff)
+      .limit(1)
+      .maybeSingle();
+    return data;
   },
 
-  addVisit({ visitor_id, page, ip }) {
-    const v = { id: data.nextIds.visit++, visitor_id, page, ip: ip || '', created_at: new Date().toISOString() };
-    data.visits.push(v);
-    save();
-    return v;
+  async addVisit({ visitor_id, page, ip }) {
+    const { data } = await supabase
+      .from('visits')
+      .insert({ visitor_id, page: page || '/', ip: ip || '' })
+      .select()
+      .single();
+    return data;
   }
 };
 

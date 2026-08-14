@@ -9,8 +9,6 @@ const productRoutes = require('./routes/products');
 const visitRoutes = require('./routes/visits');
 const contactRoutes = require('./routes/contact');
 
-ensureSeedAdmin();
-
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -24,6 +22,12 @@ app.use('/api/contact', contactRoutes);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Navin Iron Industries site running at http://localhost:${PORT}`);
-});
+
+async function start() {
+  await ensureSeedAdmin();
+  app.listen(PORT, () => {
+    console.log(`Navin Iron Industries site running at http://localhost:${PORT}`);
+  });
+}
+
+start();

@@ -11,8 +11,8 @@ router.post('/', async (req, res) => {
   const cooldownMinutes = parseInt(process.env.VISIT_NOTIFY_COOLDOWN_MINUTES || '60', 10);
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
 
-  const recent = db.findRecentVisit(visitorId, cooldownMinutes);
-  db.addVisit({ visitor_id: visitorId, page: page || '/', ip });
+  const recent = await db.findRecentVisit(visitorId, cooldownMinutes);
+  await db.addVisit({ visitor_id: visitorId, page: page || '/', ip });
 
   if (!recent) {
     // First visit from this browser in the cooldown window — send the notification email.
