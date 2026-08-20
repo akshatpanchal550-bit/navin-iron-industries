@@ -6,6 +6,12 @@ const { requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
@@ -17,6 +23,9 @@ const upload = multer({
 
 function uploadToCloudinary(buffer) {
   return new Promise((resolve, reject) => {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return reject(new Error('Cloudinary environment variables are missing on the server.'));
+    }
     const stream = cloudinary.uploader.upload_stream(
       { folder: 'navin-iron-industries' },
       (error, result) => (error ? reject(error) : resolve(result))
@@ -40,7 +49,7 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
     res.json(product);
   } catch (err) {
     console.error('[products] Cloudinary upload failed:', err.message);
-    res.status(500).json({ error: 'Photo upload failed. Check Cloudinary settings.' });
+    res.status(500).json({ error: 'Photo upload failed: ' + err.message });
   }
 });
 
@@ -56,7 +65,7 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
       imagePath = result.secure_url;
     } catch (err) {
       console.error('[products] Cloudinary upload failed:', err.message);
-      return res.status(500).json({ error: 'Photo upload failed. Check Cloudinary settings.' });
+      return res.status(500).json({ error: 'Photo upload failed: ' + err.message });
     }
   }
 
