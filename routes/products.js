@@ -34,8 +34,8 @@ function uploadToCloudinary(buffer) {
   });
 }
 
-router.get('/', (req, res) => {
-  res.json(db.listProducts());
+router.get('/', async (req, res) => {
+  res.json(await db.listProducts());
 });
 
 router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
@@ -45,17 +45,17 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
   }
   try {
     const result = await uploadToCloudinary(req.file.buffer);
-    const product = db.createProduct({ title, category, description, image_path: result.secure_url });
+    const product = await db.createProduct({ title, category, description, image_path: result.secure_url });
     res.json(product);
   } catch (err) {
-    console.error('[products] Cloudinary upload failed:', err.message);
+    console.error('[products] Upload failed:', err.message);
     res.status(500).json({ error: 'Photo upload failed: ' + err.message });
   }
 });
 
 router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   const { title, category, description } = req.body;
-  const existing = db.getProduct(req.params.id);
+  const existing = await db.getProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
 
   let imagePath = existing.image_path;
@@ -64,12 +64,12 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
       const result = await uploadToCloudinary(req.file.buffer);
       imagePath = result.secure_url;
     } catch (err) {
-      console.error('[products] Cloudinary upload failed:', err.message);
+      console.error('[products] Upload failed:', err.message);
       return res.status(500).json({ error: 'Photo upload failed: ' + err.message });
     }
   }
 
-  db.updateProduct(req.params.id, {
+  await db.updateProduct(req.params.id, {
     title: title || existing.title,
     category: category || existing.category,
     description: description || existing.description,
@@ -78,10 +78,10 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/:id', requireAdmin, (req, res) => {
-  const existing = db.getProduct(req.params.id);
+router.delete('/:id', requireAdmin, async (req, res) => {
+  const existing = await db.getProduct(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Product not found' });
-  db.deleteProduct(req.params.id);
+  await db.deleteProduct(req.params.id);
   res.json({ ok: true });
 });
 
