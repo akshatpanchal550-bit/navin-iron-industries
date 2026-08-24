@@ -24,10 +24,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 3000;
 
 async function start() {
-  await ensureSeedAdmin();
-  app.listen(PORT, () => {
-    console.log(`Navin Iron Industries site running at http://localhost:${PORT}`);
-  });
+  try {
+    await ensureSeedAdmin();
+    app.listen(PORT, () => {
+      console.log(`Navin Iron Industries site running at http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  }
 }
 
 start();
