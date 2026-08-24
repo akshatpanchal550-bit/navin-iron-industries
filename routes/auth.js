@@ -16,7 +16,7 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
 
-  const token = jwt.sign({ id: admin.id, email: admin.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: admin._id.toString(), email: admin.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.cookie('admin_token', token, {
     httpOnly: true,
     sameSite: 'lax',
