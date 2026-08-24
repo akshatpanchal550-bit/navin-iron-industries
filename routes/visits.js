@@ -15,7 +15,6 @@ router.post('/', async (req, res) => {
   await db.addVisit({ visitor_id: visitorId, page: page || '/', ip });
 
   if (!recent) {
-    // First visit from this browser in the cooldown window — send the notification email.
     await sendMail({
       subject: 'New visitor on navinironindustries.com',
       text: `Someone visited your website.\nPage: ${page || '/'}\nTime: ${new Date().toLocaleString('en-IN')}`,
