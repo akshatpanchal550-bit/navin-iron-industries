@@ -19,6 +19,26 @@ app.use('/api/products', productRoutes);
 app.use('/api/visits', visitRoutes);
 app.use('/api/contact', contactRoutes);
 
+app.get('/api/debug-db', async (req, res) => {
+  try {
+    const { MongoClient } = require('mongodb');
+    const client = new MongoClient(process.env.MONGODB_URI);
+    await client.connect();
+    const db = client.db('navin_iron_industries');
+    const cols = await db.listCollections().toArray();
+    const productsCount = await db.collection('products').countDocuments();
+    res.json({
+      dbName: db.databaseName,
+      collections: cols.map(c => c.name),
+      productsCount,
+      cloudinaryConfigured: !!process.env.CLOUDINARY_CLOUD_NAME
+    });
+    await client.close();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
