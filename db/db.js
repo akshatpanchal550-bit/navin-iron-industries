@@ -6,7 +6,10 @@ let dbInstance;
 
 async function connect() {
   if (dbInstance) return dbInstance;
-  client = new MongoClient(process.env.MONGODB_URI);
+  client = new MongoClient(process.env.MONGODB_URI, {
+    writeConcern: { w: 'majority' },
+    retryWrites: true
+  });
   await client.connect();
   dbInstance = client.db('navin_iron_industries');
   return dbInstance;
